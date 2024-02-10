@@ -33,6 +33,12 @@ public class Table {
     AtomicInteger valCard;
     AtomicInteger valSlot;
 
+
+    //////
+    public Integer [] [] grid;
+
+
+
     /**
      * Constructor for testing.
      *
@@ -47,6 +53,9 @@ public class Table {
         this.cardToSlot = cardToSlot;
         valCard = new AtomicInteger(0);
         valSlot = new AtomicInteger(0);
+
+        this.grid = new Integer[4][3];
+
     }
 
     /**
@@ -157,8 +166,8 @@ public class Table {
      * @param slot   - the slot on which to place the token.
      */
     public void placeToken(int player, int slot) {
-
         // TODO implement
+
     }
 
     /**
@@ -171,4 +180,19 @@ public class Table {
         // TODO implement
         return false;
     }
+
+
+
+    // getCard method
+    public int getCard(int slot) {
+        return slotToCard[slot];
+    }
+
+    public void removeAllCardsFromTable(){//Anni added it
+        for(int slot = 0; slot < cardToSlot.length; slot++){
+            removeCard(slot);
+            env.ui.removeCard(slot);
+        }
+    }
+
 }
