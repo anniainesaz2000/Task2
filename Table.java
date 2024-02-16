@@ -54,7 +54,7 @@ public class Table {
         valCard = new AtomicInteger(0);
         valSlot = new AtomicInteger(0);
 
-        this.grid = new Integer[4][3];
+        this.grid = new Integer[4][3];//Anni - should the size be generic?
 
     }
 
@@ -126,6 +126,9 @@ public class Table {
 
 //        cardToSlot[card] = slot;
 //        slotToCard[slot] = card;
+        int slot = column + this.table.grid[0].length * row;
+        this.grid[row][column] = card;
+        //add to grid
 
         // TODO implement
     }
@@ -135,26 +138,32 @@ public class Table {
      * @param slot - the slot from which to remove the card.
      */
     public void removeCard(int slot) {
-        try {
-            Thread.sleep(env.config.tableDelayMillis);
-        } catch (InterruptedException ignored) {}
+//        try {
+//            Thread.sleep(env.config.tableDelayMillis);
+//        } catch (InterruptedException ignored) {}
+//
+//        Integer oldCard;
+//        Integer newCard = null;
+//
+//        if (slotToCard[slot] != null) {
+//
+//            do{
+//                oldCard = slotToCard[slot];
+//
+//            }while(!(valCard.compareAndSet(oldCard,newCard)));
+//
+//
+//
+//            slotToCard[slot] = null;
+//            cardToSlot[valCard.get()] = null;
+//
+//        }
 
-        Integer oldCard;
-        Integer newCard = null;
+        int card = slotToCard[slot];
+        slotToCard[slot] = null;
+        cardToSlot[card] = null;
 
-        if (slotToCard[slot] != null) {
-
-            do{
-                oldCard = slotToCard[slot];
-
-            }while(!(valCard.compareAndSet(oldCard,newCard)));
-
-
-
-            slotToCard[slot] = null;
-            cardToSlot[valCard.get()] = null;
-
-        }
+        //remove from grid
 
 
         // TODO implement
@@ -180,7 +189,6 @@ public class Table {
         // TODO implement
         return false;
     }
-
 
 
     // getCard method
