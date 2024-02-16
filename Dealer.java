@@ -1,4 +1,5 @@
 package bguspl.set.ex;
+import java.util.Collections;
 
 import bguspl.set.Env;
 
@@ -46,6 +47,7 @@ public class Dealer implements Runnable {
         this.table = table;
         this.players = players;
         deck = IntStream.range(0, env.config.deckSize).boxed().collect(Collectors.toList());
+        this.terminate = false;//Anni
     }
 
     /**
@@ -58,7 +60,9 @@ public class Dealer implements Runnable {
             //should we create players threads here? according to config?
             placeCardsOnTable();
             //how to shuffle cards?
+            //should we add timer field?
             timerLoop();
+            //check if there are legal sets deck + table (60 sec or less?)
             updateTimerDisplay(false);
             removeAllCardsFromTable();
         }
@@ -81,8 +85,23 @@ public class Dealer implements Runnable {
     /**
      * Called when the game should be terminated.
      */
-    public void terminate() {
+    public void terminate() {//is connected to interrupt?- Anni
+        List<Integer> cardsOnTable = createListFromArray(this.table.grid);
+        if((env.util.findSets(cardsOnTable, 1).isEmpty()) && (env.util.findSets(this.deck, 1).isEmpty())) {
+            terminate = true;
+        }
+
         // TODO implement
+    }
+
+    public static List<Integer> createListFromArray(Integer[][] array) {
+        List<Integer> list = new ArrayList<>();
+        for (Integer[] row : array) {
+            for (Integer element : row) {
+                list.add(element);
+            }
+        }
+        return list;
     }
 
     /**
@@ -91,14 +110,16 @@ public class Dealer implements Runnable {
      * @return true iff the game should be finished.
      */
     private boolean shouldFinish() {
-        return terminate || env.util.findSets(deck, 1).size() == 0;
+        terminate();
+        return this.deck.isEmpty() || terminate;
+        //return terminate || env.util.findSets(deck, 1).size() == 0;
     }
 
     /**
      * Checks cards should be removed from the table and removes them.
      */
     private void removeCardsFromTable() {//Anni did it - should be only cards that needs to be removed (not all)
-
+        //why do we need it if we remove it in testSet
 
         // TODO implement
 
@@ -107,9 +128,31 @@ public class Dealer implements Runnable {
     /**
      * Check if any cards can be removed from the deck and placed on the table.
      */
-    private void placeCardsOnTable() {//Anni asks a question
-        //is the table we get in the constructor full or empty? if empty how do we know what cards to put (config)?
-        // TODO implement
+    private void placeCardsOnTable() {
+        shuffleDeck();
+        int slot = 0;
+
+        for (int i = 0 ; i < this.table.grid.length; i++){
+            for(int j = 0; j < this.table.grid[i].length; j++){
+                if(!this.deck.isEmpty()){
+                    int card = this.deck.remove(0);
+                    this.table.grid[i][j] = card;
+                    this.table. placeCard(card, slot);
+                    slot++;
+                }
+            }
+        }
+
+        }
+
+    private void placeSpecificCardsOnTable(int row, int column){
+        int slot = column + this.table.grid[0].length * row;
+        if(!this.deck.isEmpty()){
+            int card = this.deck.remove(0);
+            this.table.placeCard(card, slot);
+            env.ui.placeCard(card, slot);
+        }
+
     }
 
     /**
@@ -131,16 +174,15 @@ public class Dealer implements Runnable {
      */
     private void removeAllCardsFromTable() {//Anni made some changes + asks a question
 
-//        for (int i = 0; i < table.grid.length; i++) {
-//            for (int j = 0; j < table.grid[i].length; j++) {
-//                if (table.grid[i][j] != null) {
-//                    deck.add(table.grid[i][j]);
-//                    table.removeCard(table.grid[i][j]);
-//                    table.grid[i][j] = null;
-//                }
-//            }
-//        }
-        //do we need to check first if there is any legal set in deck/table?
+        for (int i = 0; i < table.grid.length; i++) {
+            for (int j = 0; j < table.grid[i].length; j++) {
+                if (table.grid[i][j] != null) {
+                    deck.add(table.grid[i][j]);
+                    table.grid[i][j] = null;
+                }
+
+            }
+        }
         //is there another occasion in which we need to remove all? maybe every 60 sec?
         table.removeAllCardsFromTable();
         //do we need to change the players table too or is it the same table?
@@ -179,23 +221,37 @@ public class Dealer implements Runnable {
 
 
     // The following methods are added for the purpose of the exercise.
-    protected synchronized boolean testSet(int[] cards) {
-        // need to implement as system function
+    protected synchronized boolean testSet(int[] cards) {//we added it
+        //add a queue for players needs to be checked? or semaphor for fairity?
         if(cards.length != 3) {
             return false;
         }
         boolean isSet = env.util.testSet(cards);
         if(isSet) {
             for (int i = 0; i < 3; i++) {
-                table.removeCard(cards[i]);
+                int card = cards[i];
+                int slot = this.table.cardToSlot[card];
+                for(int row = 0; row < this.table.grid.length; row++){
+                    for(int col = 0; col < this.table.grid[0].length; col++){
+                        if(this.table.grid[row][col] == cards[i]){
+                            table.removeCard(card);
+                            env.ui.removeCard(slot);
+                            placeSpecificCardsOnTable(row, col);
+                        }
+                    }
+                }
+
             }
-            placeCardsOnTable(); // TODO implement
             //check if there is sets on the table
 
             return true;
         }
         return false;
 
+    }
+
+    private void shuffleDeck(){//Anni
+        Collections.shuffle(this.deck);
     }
 
     // helper function that checks if there is a set on the table and deck
