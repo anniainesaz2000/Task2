@@ -59,6 +59,7 @@ public class Dealer implements Runnable {
         while (!shouldFinish()) {
             //should we create players threads here? according to config?
             placeCardsOnTable();
+            //if timer == 0 and, break
             //how to shuffle cards?
             //should we add timer field?
             timerLoop();
@@ -75,7 +76,7 @@ public class Dealer implements Runnable {
      */
     private void timerLoop() {
         while (!terminate && System.currentTimeMillis() < reshuffleTime) {
-            sleepUntilWokenOrTimeout();
+            //sleepUntilWokenOrTimeout(); should happen in threads
             updateTimerDisplay(false);
             removeCardsFromTable();
             placeCardsOnTable();
@@ -111,8 +112,7 @@ public class Dealer implements Runnable {
      */
     private boolean shouldFinish() {
         terminate();
-        return this.deck.isEmpty() || terminate;
-        //return terminate || env.util.findSets(deck, 1).size() == 0;
+        return terminate || env.util.findSets(deck, 1).size() == 0;
     }
 
     /**
@@ -166,7 +166,7 @@ public class Dealer implements Runnable {
      * Reset and/or update the countdown and the countdown display.
      */
     private void updateTimerDisplay(boolean reset) {
-        // TODO implement
+        System.currentTimeMillis()
     }
 
     /**
@@ -228,27 +228,34 @@ public class Dealer implements Runnable {
         }
         boolean isSet = env.util.testSet(cards);
         if(isSet) {
-            for (int i = 0; i < 3; i++) {
-                int card = cards[i];
-                int slot = this.table.cardToSlot[card];
-                for(int row = 0; row < this.table.grid.length; row++){
-                    for(int col = 0; col < this.table.grid[0].length; col++){
-                        if(this.table.grid[row][col] == cards[i]){
-                            table.removeCard(card);
-                            env.ui.removeCard(slot);
-                            placeSpecificCardsOnTable(row, col);
+                for (int i = 0; i < 3; i++) {
+                    int card = cards[i];
+                    int slot = this.table.cardToSlot[card];
+                    for(int row = 0; row < this.table.grid.length; row++){
+                        for(int col = 0; col < this.table.grid[0].length; col++){
+                            if(this.table.grid[row][col] == card){
+                                table.removeCard(slot);
+                                env.ui.removeCard(slot);
+                                for(int j = 0; j<this.players.length; j++){
+                                    if(players[j].SetsQueue.contains(card)){
+                                        players[j].SetsQueue.remove(card);
+                                        env.ui.removeToken(players[j].id, slot);
+                                    }
+                                }
+                                if (!this.deck.isEmpty()){
+                                    placeSpecificCardsOnTable(row, col);
+                                }
+
+                            }
                         }
                     }
+
                 }
-
-            }
-            //check if there is sets on the table
-
             return true;
-        }
+            }
         return false;
 
-    }
+        }
 
     private void shuffleDeck(){//Anni
         Collections.shuffle(this.deck);
