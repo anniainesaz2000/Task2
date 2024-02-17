@@ -59,7 +59,7 @@ public class Player implements Runnable {
     // our new fields
     private Dealer dealer;
 
-    BlockingQueue<Integer> SetsQueue; // i added this line
+    public BlockingQueue<Integer> SetsQueue; // i added this line
 
     /**
      * The class constructor.
@@ -131,11 +131,13 @@ public class Player implements Runnable {
     public void keyPressed(int slot) {   // need to be checked if correct slot number
         // needed to use with thread
 
-        int card = table.getCard(slot);
-        if(SetsQueue.size() < 3 && SetsQueue.contains(card) == false) {
+        Integer card = table.getCard(slot);
+        if(SetsQueue.size() < 3 && !SetsQueue.contains(card) && card!=null) {
             SetsQueue.add(card);
-        } else if (SetsQueue.contains(card) == true) {
+            env.ui.placeToken(this.id,slot);
+        } else if (SetsQueue.contains(card)) {
             SetsQueue.remove(card);
+            env.ui.removeToken(this.id,slot);
         }
         if (SetsQueue.size() == 3) {
             Integer[] testSet = SetsQueue.toArray(new Integer[3]);
@@ -147,8 +149,12 @@ public class Player implements Runnable {
                 point();
             } else {
                 penalty();
+//                for(Integer token: SetsQueue){
+//                    env.ui.removeToken(this.id, this.table.getSlot(token));
+//                }
+//                SetsQueue.clear();
             }
-            SetsQueue.clear();
+
         }
 
     }
