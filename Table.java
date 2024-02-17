@@ -102,35 +102,42 @@ public class Table {
      * @post - the card placed is on the table, in the assigned slot.
      */
     public void placeCard(int card, int slot) {
-        try {
-            Thread.sleep(env.config.tableDelayMillis);
-        } catch (InterruptedException ignored) {}
+//        try {
+//            Thread.sleep(env.config.tableDelayMillis);
+//        } catch (InterruptedException ignored) {}
+//
+//        int oldSlot;
+//        int oldCard;
+//
+//        int newSlot;
+//        int newCard;
+//
+//        do{
+//            oldSlot = valSlot.get();
+//            oldCard = valCard.get();
+//
+//            newSlot = slot;
+//            newCard = card;
+//
+//        }while(!(valCard.compareAndSet(oldCard,newCard) && valSlot.compareAndSet(oldSlot,newSlot)));
+//
+//        cardToSlot[valCard.get()] = valSlot.get();
+//        slotToCard[valSlot.get()] = valCard.get();
 
-        int oldSlot;
-        int oldCard;
+        cardToSlot[card] = slot;
+        slotToCard[slot] = card;
 
-        int newSlot;
-        int newCard;
+        boolean keepLoop = true;
+        for(int row = 0; row < this.grid.length && keepLoop; row++) {
+            for (int col = 0; col < this.grid[0].length && keepLoop; col++) {
+                if (this.grid[row][col] == null) {
+                    this.grid[row][col] = card;
+                    keepLoop = false;
+                }
 
-        do{
-            oldSlot = valSlot.get();
-            oldCard = valCard.get();
+            }
 
-            newSlot = slot;
-            newCard = card;
-
-        }while(!(valCard.compareAndSet(oldCard,newCard) && valSlot.compareAndSet(oldSlot,newSlot)));
-
-        cardToSlot[valCard.get()] = valSlot.get();
-        slotToCard[valSlot.get()] = valCard.get();
-
-//        cardToSlot[card] = slot;
-//        slotToCard[slot] = card;
-        int slot = column + this.table.grid[0].length * row;
-        this.grid[row][column] = card;
-        //add to grid
-
-        // TODO implement
+        }
     }
 
     /**
@@ -163,10 +170,18 @@ public class Table {
         slotToCard[slot] = null;
         cardToSlot[card] = null;
 
-        //remove from grid
+        boolean keepLoop = true;
+        for(int row = 0; row < this.grid.length && keepLoop; row++){
+            for(int col = 0; col < this.grid[0].length && keepLoop; col++){
+                if(this.grid[row][col] == card){
+                    this.grid[row][col] = null;
+                    keepLoop = false;
+                }
 
+            }
 
-        // TODO implement
+        }
+
     }
 
     /**
@@ -192,8 +207,12 @@ public class Table {
 
 
     // getCard method
-    public int getCard(int slot) {
-        return slotToCard[slot];
+    public Integer getCard(int slot) {
+        return this.slotToCard[slot];
+    }
+
+    public Integer getSlot(int card) {
+        return this.cardToSlot[card];
     }
 
     public void removeAllCardsFromTable(){//Anni added it
