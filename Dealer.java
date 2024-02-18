@@ -79,6 +79,7 @@ public class Dealer implements Runnable {
             //sleepUntilWokenOrTimeout(); should happen in threads
             updateTimerDisplay(false);
             removeCardsFromTable();
+            //if should finish
             placeCardsOnTable();
         }
     }
@@ -166,7 +167,7 @@ public class Dealer implements Runnable {
      * Reset and/or update the countdown and the countdown display.
      */
     private void updateTimerDisplay(boolean reset) {
-        System.currentTimeMillis()
+        //System.currentTimeMillis()
     }
 
     /**
