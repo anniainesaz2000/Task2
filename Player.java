@@ -72,11 +72,19 @@ public class Player implements Runnable {
      */
     public Player(Env env, Dealer dealer, Table table, int id, boolean human) {
         this.env = env;
+        this.dealer = dealer;
         this.table = table;
         this.id = id;
         this.human = human;
+        this.terminate = false;
 
-        this.dealer = dealer;
+//        if(human){
+//            this.playerThread = new Thread(this, "player-" + id);
+//        }
+//        else {
+//            this.aiThread = new Thread(this, "computer-" + id);
+//        }
+
         SetsQueue = new ArrayBlockingQueue<Integer>(3);
     }
 
@@ -85,11 +93,12 @@ public class Player implements Runnable {
      */
     @Override
     public void run() {
-        playerThread = Thread.currentThread();
+        this.playerThread = Thread.currentThread();
         env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
         if (!human) createArtificialIntelligence();
 
         while (!terminate) {
+            //get input from player (create input manager?)
             // TODO implement main player loop
         }
         if (!human) try { aiThread.join(); } catch (InterruptedException ignored) {}
@@ -102,7 +111,7 @@ public class Player implements Runnable {
      */
     private void createArtificialIntelligence() {
         // note: this is a very, very smart AI (!)
-        aiThread = new Thread(() -> {
+        this.aiThread = new Thread(() -> {
             env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
             while (!terminate) {
                 // TODO implement player key press simulator
@@ -128,17 +137,19 @@ public class Player implements Runnable {
      *
      * @param slot - the slot corresponding to the key pressed.
      */
-    public void keyPressed(int slot) {   // need to be checked if correct slot number
+    public void keyPressed(int slot) {
         // needed to use with thread
 
         Integer card = table.getCard(slot);
-        if(SetsQueue.size() < 3 && !SetsQueue.contains(card) && card!=null) {
-            SetsQueue.add(card);
-            env.ui.placeToken(this.id,slot);
-        } else if (SetsQueue.contains(card)) {
-            SetsQueue.remove(card);
-            env.ui.removeToken(this.id,slot);
+        if(SetsQueue.size() < 3 && !SetsQueue.contains(slot) && card!=null) {
+            SetsQueue.add(slot);
+            table.placeToken(this.id, slot);
+        } else if (SetsQueue.contains(slot)) {
+            SetsQueue.remove(slot);
+            table.removeToken(this.id, slot);
         }
+
+        //should be done in table?
         if (SetsQueue.size() == 3) {
             Integer[] testSet = SetsQueue.toArray(new Integer[3]);
             int[] testSetInt = new int[3];
@@ -169,8 +180,10 @@ public class Player implements Runnable {
         // TODO implement
         // the player getting frozen fo 1 second
         try {
-            Thread.sleep(1000);
+            env.ui.setFreeze(this.id,env.config.pointFreezeMillis);
+            Thread.sleep(env.config.pointFreezeMillis);
         } catch (InterruptedException e) {
+            env.ui.setFreeze(id,0);
             Thread.currentThread().interrupt();
         }
 
@@ -189,8 +202,10 @@ public class Player implements Runnable {
         // TODO implement
 
         try {
-            Thread.sleep(4000);
+            env.ui.setFreeze(id,env.config.penaltyFreezeMillis);
+            Thread.sleep(env.config.penaltyFreezeMillis);
         } catch (InterruptedException e) {
+            env.ui.setFreeze(id,0);
             Thread.currentThread().interrupt();
         }
     }
@@ -198,4 +213,52 @@ public class Player implements Runnable {
     public int score() {
         return score;
     }
+
+
+    public int [] generateRandomNumber() {
+        int [] randomSet = new int[2];
+        int a = (int) (Math.random() * table.grid.length);
+        int b = (int) (Math.random() * table.grid[0].length);
+        randomSet[0] = a;
+        randomSet[1] = b;
+        return randomSet;
+    }
+
+    public void generateRandomSet() {
+        while (SetsQueue.size() < 3) {
+            int [] randomSet = generateRandomNumber();
+            int card = table.getCard(table.getCardgrid(randomSet[0], randomSet[1]));
+            int slot = table.getSlot(card);
+            if(SetsQueue.size() < 3 && !SetsQueue.contains(card)) {
+                SetsQueue.add(card);
+                table.placeToken(id, table.getSlot(card));
+                env.ui.placeToken(this.id,slot);
+            } else if (SetsQueue.contains(card) == true) {
+                SetsQueue.remove(card);
+                table.removeToken(id, table.getSlot(card));
+                env.ui.removeToken(this.id,slot);
+            }
+            if (SetsQueue.size() == 3) {
+                Integer[] testSet = SetsQueue.toArray(new Integer[3]);
+                int[] testSetInt = new int[3];
+                for (int i = 0; i < 3; i++) {
+                    testSetInt[i] = testSet[i].intValue();
+                }
+                if (dealer.testSet(testSetInt)) {
+                    point();
+                } else {
+                    penalty();
+                }
+                for(int i = 0; i < 3; i++) {
+                    table.removeToken(id, table.getSlot(testSetInt[i]));
+                    env.ui.removeToken(this.id,slot);
+                }
+                SetsQueue.clear();
+
+            }
+
+        }
+    }
 }
+
+
