@@ -1,10 +1,8 @@
 package bguspl.set.ex;
-import java.util.Collections;
+import java.util.*;
 
 import bguspl.set.Env;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -37,7 +35,8 @@ public class Dealer implements Runnable {
     /**
      * The time when the dealer needs to reshuffle the deck due to turn timeout.
      */
-    private long reshuffleTime = Long.MAX_VALUE;
+    private long reshuffleTime = 60000;
+    public Queue<Player> playersQueue;
 
 
 
@@ -47,7 +46,8 @@ public class Dealer implements Runnable {
         this.table = table;
         this.players = players;
         deck = IntStream.range(0, env.config.deckSize).boxed().collect(Collectors.toList());
-        this.terminate = false;//Anni
+        this.terminate = false;
+        this.playersQueue = new LinkedList<>();
     }
 
     /**
@@ -87,7 +87,7 @@ public class Dealer implements Runnable {
     /**
      * Called when the game should be terminated.
      */
-    public void terminate() {//is connected to interrupt?- Anni
+    public void terminate() {//x
         List<Integer> cardsOnTable = createListFromArray(this.table.grid);
         if((env.util.findSets(cardsOnTable, 1).isEmpty()) && (env.util.findSets(this.deck, 1).isEmpty())) {
             terminate = true;
@@ -112,7 +112,7 @@ public class Dealer implements Runnable {
      * @return true iff the game should be finished.
      */
     private boolean shouldFinish() {
-        terminate();
+
         return terminate || env.util.findSets(deck, 1).size() == 0;
     }
 
@@ -146,7 +146,7 @@ public class Dealer implements Runnable {
 
         }
 
-    private void placeSpecificCardsOnTable(int row, int column){
+    private void placeSpecificCardOnTable(int row, int column){
         int slot = column + this.table.grid[0].length * row;
         if(!this.deck.isEmpty()){
             int card = this.deck.remove(0);
@@ -166,8 +166,19 @@ public class Dealer implements Runnable {
     /**
      * Reset and/or update the countdown and the countdown display.
      */
-    private void updateTimerDisplay(boolean reset) {
-        //System.currentTimeMillis()
+    private void updateTimerDisplay(boolean reset) {//should we update current time?
+        int currentTime = 60000;  // Initial time in milliseconds (60 seconds)
+
+        // Update time each second
+        for (int i = 0; i < 60; i++) {
+            env.ui.setCountdown(currentTime, reset);
+            currentTime -= 1000;  // Subtract 1000 milliseconds (1 second)
+            try {
+                Thread.sleep(1000);  // Pause for 1 second
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     /**
@@ -175,19 +186,13 @@ public class Dealer implements Runnable {
      */
     private void removeAllCardsFromTable() {//Anni made some changes + asks a question
 
-        for (int i = 0; i < table.grid.length; i++) {
-            for (int j = 0; j < table.grid[i].length; j++) {
-                if (table.grid[i][j] != null) {
-                    deck.add(table.grid[i][j]);
-                    table.grid[i][j] = null;
-                }
-
-            }
-        }
         //is there another occasion in which we need to remove all? maybe every 60 sec?
         table.removeAllCardsFromTable();
+        for(Player player : players){
+            player.setsQueue.clear();
+        }
         //do we need to change the players table too or is it the same table?
-        // TODO implement
+
     }
 
     /**
@@ -223,7 +228,7 @@ public class Dealer implements Runnable {
 
     // The following methods are added for the purpose of the exercise.
     protected synchronized boolean testSet(int[] cards) {//we added it
-        //add a queue for players needs to be checked? or semaphor for fairity?
+
         if(cards.length != 3) {
             return false;
         }
@@ -236,15 +241,14 @@ public class Dealer implements Runnable {
                         for(int col = 0; col < this.table.grid[0].length; col++){
                             if(this.table.grid[row][col] == card){
                                 table.removeCard(slot);
-                                env.ui.removeCard(slot);
                                 for(int j = 0; j<this.players.length; j++){
-                                    if(players[j].SetsQueue.contains(card)){
-                                        players[j].SetsQueue.remove(card);
-                                        env.ui.removeToken(players[j].id, slot);
+                                    if(players[j].setsQueue.contains(card)){
+                                        players[j].setsQueue.remove(card);
+                                        table.removeToken(players[j].id, slot);
                                     }
                                 }
                                 if (!this.deck.isEmpty()){
-                                    placeSpecificCardsOnTable(row, col);
+                                    placeSpecificCardOnTable(row, col);
                                 }
 
                             }
@@ -261,6 +265,31 @@ public class Dealer implements Runnable {
     private void shuffleDeck(){//Anni
         Collections.shuffle(this.deck);
     }
+    public void playerToQueue(Player player){
+        playersQueue.add(player);
+    }
 
-    // helper function that checks if there is a set on the table and deck
+    public void getSetToTest(){
+
+        Iterator<Player> iterator = this.playersQueue.iterator();
+        while (iterator.hasNext()) {
+            Player player = iterator.next();
+            if(player.setsQueue.size()==3){
+                if(testSet(player.setQueueToArray())){
+                    player.point();
+                }
+
+                else{
+                    player.penalty();
+                }
+            }
+            else{
+                iterator.remove();
+            }
+
+        }
+
+    }
+
+
 }
