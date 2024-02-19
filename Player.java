@@ -2,21 +2,17 @@ package bguspl.set.ex;
 
 import bguspl.set.Env;
 
-import java.util.Arrays;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.concurrent.ArrayBlockingQueue;
+
+import java.util.concurrent.BlockingQueue;
 
 /**
- * This class contains the data that is visible to the player.
+ * This class manages the players' threads and data
  *
- * @inv slotToCard[x] == y iff cardToSlot[y] == x
+ * @inv id >= 0
+ * @inv score >= 0
  */
-public class Table {
+public class Player implements Runnable {
 
     /**
      * The game environment object.
@@ -24,216 +20,219 @@ public class Table {
     private final Env env;
 
     /**
-     * Mapping between a slot and the card placed in it (null if none).
+     * Game entities.
      */
-    protected final Integer[] slotToCard; // card per slot (if any)
+    private final Table table;
 
     /**
-     * Mapping between a card and the slot it is in (null if none).
+     * The id of the player (starting from 0).
      */
-    protected final Integer[] cardToSlot; // slot per card (if any)
-    public Integer [] [] grid;
-    protected ArrayList[] slotsToPlayers;
-    protected List<Integer>[] playersToSlots;
-
-    public Queue<Player> playersQueue;
-
-//    AtomicInteger valCard;
-//    AtomicInteger valSlot;
-
-
-
+    public final int id;
 
     /**
-     * Constructor for testing.
+     * The thread representing the current player.
+     */
+    private Thread playerThread;
+
+    /**
+     * The thread of the AI (computer) player (an additional thread used to generate key presses).
+     */
+    private Thread aiThread;
+
+    /**
+     * True iff the player is human (not a computer player).
+     */
+    private final boolean human;
+
+    /**
+     * True iff game should be terminated.
+     */
+    private volatile boolean terminate;
+
+    /**
+     * The current score of the player.
+     */
+    private int score;
+
+    // our new fields
+
+    private Dealer dealer;
+
+    public BlockingQueue<Integer> setsQueue;
+
+    /**
+     * The class constructor.
      *
-     * @param env        - the game environment objects.
-     * @param slotToCard - mapping between a slot and the card placed in it (null if none).
-     * @param cardToSlot - mapping between a card and the slot it is in (null if none).
+     * @param env    - the environment object.
+     * @param dealer - the dealer object.
+     * @param table  - the table object.
+     * @param id     - the id of the player.
+     * @param human  - true iff the player is a human player (i.e. input is provided manually, via the keyboard).
      */
-    public Table(Env env, Integer[] slotToCard, Integer[] cardToSlot) {
-
+    public Player(Env env, Dealer dealer, Table table, int id, boolean human) {
         this.env = env;
-        this.slotToCard = slotToCard;
-        this.cardToSlot = cardToSlot;
-        this.slotsToPlayers = new ArrayList[slotToCard.length];
-        //this.playersToSlots = new ArrayList[this.de.length];
-//        valCard = new AtomicInteger(0);
-//        valSlot = new AtomicInteger(0);
-
-        this.grid = new Integer[4][3];//Anni - should the size be generic?
-        this.playersQueue = new LinkedList<>();
-
+        this.dealer = dealer;
+        this.table = table;
+        this.id = id;
+        this.human = human;
+        this.terminate = false;
+        setsQueue = new ArrayBlockingQueue<Integer>(3);
     }
 
     /**
-     * Constructor for actual usage.
-     *
-     * @param env - the game environment objects.
+     * The main player thread of each player starts here (main loop for the player thread).
      */
-    public Table(Env env) {
+    @Override
+    public void run() {
+        this.playerThread = Thread.currentThread();
+        env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
+        if (!human) createArtificialIntelligence();
 
-        this(env, new Integer[env.config.tableSize], new Integer[env.config.deckSize]);
+        while (!terminate) {
+            //get input from player (create input manager?)
+            // TODO implement main player loop
+        }
+        if (!human) try { aiThread.join(); } catch (InterruptedException ignored) {}
+        env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
     }
 
     /**
-     * This method prints all possible legal sets of cards that are currently on the table.
+     * Creates an additional thread for an AI (computer) player. The main loop of this thread repeatedly generates
+     * key presses. If the queue of key presses is full, the thread waits until it is not full.
      */
-    public void hints() {
-        List<Integer> deck = Arrays.stream(slotToCard).filter(Objects::nonNull).collect(Collectors.toList());
-        env.util.findSets(deck, Integer.MAX_VALUE).forEach(set -> {
-            StringBuilder sb = new StringBuilder().append("Hint: Set found: ");
-            List<Integer> slots = Arrays.stream(set).mapToObj(card -> cardToSlot[card]).sorted().collect(Collectors.toList());
-            int[][] features = env.util.cardsToFeatures(set);
-            System.out.println(sb.append("slots: ").append(slots).append(" features: ").append(Arrays.deepToString(features)));
-        });
-    }
-
-    /**
-     * Count the number of cards currently on the table.
-     *
-     * @return - the number of cards on the table.
-     */
-    public int countCards() {
-        int cards = 0;
-        for (Integer card : slotToCard)
-            if (card != null)
-                ++cards;
-        return cards;
-    }
-
-    /**
-     * Places a card on the table in a grid slot.
-     * @param card - the card id to place in the slot.
-     * @param slot - the slot in which the card should be placed.
-     *
-     * @post - the card placed is on the table, in the assigned slot.
-     */
-    public void placeCard(int card, int slot) {
-//        try {
-//            Thread.sleep(env.config.tableDelayMillis);
-//        } catch (InterruptedException ignored) {}
-//
-//        int oldSlot;
-//        int oldCard;
-//
-//        int newSlot;
-//        int newCard;
-//
-//        do{
-//            oldSlot = valSlot.get();
-//            oldCard = valCard.get();
-//
-//            newSlot = slot;
-//            newCard = card;
-//
-//        }while(!(valCard.compareAndSet(oldCard,newCard) && valSlot.compareAndSet(oldSlot,newSlot)));
-//
-//        cardToSlot[valCard.get()] = valSlot.get();
-//        slotToCard[valSlot.get()] = valCard.get();
-
-        cardToSlot[card] = slot;
-        slotToCard[slot] = card;
-
-        boolean keepLoop = true;
-        for(int row = 0; row < this.grid.length && keepLoop; row++) {
-            for (int col = 0; col < this.grid[0].length && keepLoop; col++) {
-                if (this.grid[row][col] == null) {
-                    this.grid[row][col] = card;
-                    keepLoop = false;
-                }
+    private void createArtificialIntelligence() {
+        // note: this is a very, very smart AI (!)
+        this.aiThread = new Thread(() -> {
+            env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
+            while (!terminate) {
+                generateRandomSet();
+                try {
+                    aiThread.sleep(1000);
+                } catch (InterruptedException ignored) {}//need to change in case of interrupt
 
             }
-
-        }
+            env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
+        }, "computer-" + id);
+        aiThread.start();
     }
 
     /**
-     * Removes a card from a grid slot on the table.
-     * @param slot - the slot from which to remove the card.
+     * Called when the game should be terminated.
      */
-    public void removeCard(int slot) {
-//        try {
-//            Thread.sleep(env.config.tableDelayMillis);
-//        } catch (InterruptedException ignored) {}
-//
-//        Integer oldCard;
-//        Integer newCard = null;
-//
-//        if (slotToCard[slot] != null) {
-//
-//            do{
-//                oldCard = slotToCard[slot];
-//
-//            }while(!(valCard.compareAndSet(oldCard,newCard)));
-//
-//
-//
-//            slotToCard[slot] = null;
-//            cardToSlot[valCard.get()] = null;
-//
-//        }
+    public void terminate() {//interrupt player(?)
+        this.terminate = true;
+        // TODO implement
 
-        int card = slotToCard[slot];
-        slotToCard[slot] = null;
-        cardToSlot[card] = null;
+    }
 
-        boolean keepLoop = true;
-        for(int row = 0; row < this.grid.length && keepLoop; row++){
-            for(int col = 0; col < this.grid[0].length && keepLoop; col++){
-                if(this.grid[row][col] == card){
-                    this.grid[row][col] = null;
-                    keepLoop = false;
-                }
+    /**
+     * This method is called when a key is pressed.
+     *
+     * @param slot - the slot corresponding to the key pressed.
+     */
+    public void keyPressed(int slot) {
+        // needed to use with thread
 
+        Integer card = table.getCard(slot);
+        if(setsQueue.size() < 3 && !setsQueue.contains(slot) && card!=null) {
+            setsQueue.add(slot);
+            table.placeToken(this.id, slot);
+        } else if (setsQueue.contains(slot)) {
+            setsQueue.remove(slot);
+            table.removeToken(this.id, slot);
+        }
+
+        //should be done in table?
+        if (setsQueue.size() == 3) {
+              this.dealer.playerToQueue(this);
+
+              //notify dealer - getSetToTest
+
+
+        }
+
+    }
+
+    public int[] setQueueToArray(){
+        Integer[] testSet = setsQueue.toArray(new Integer[3]);
+        int[] testCards = new int[3];
+        for (int i = 0; i < 3; i++) {
+            testCards[i] = this.table.getCard(testSet[i]);
+             }
+
+        return testCards;
+    }
+
+    /**
+     * Award a point to a player and perform other related actions.
+     *
+     * @post - the player's score is increased by 1.
+     * @post - the player's score is updated in the ui.
+     */
+    public void point() {//sould we differ between Ai and human?
+
+        try {
+            env.ui.setFreeze(this.id,env.config.pointFreezeMillis);
+            Thread.sleep(env.config.pointFreezeMillis);
+        } catch (InterruptedException e) {
+            env.ui.setFreeze(id,0);
+            Thread.currentThread().interrupt();
+        }
+
+        int ignored = table.countCards(); // this part is just for demonstration in the unit tests
+        env.ui.setScore(id, ++score);
+
+
+    }
+
+    /**
+     * Penalize a player and perform other related actions.
+     */
+    public void penalty() {//sould we differ between Ai and human?
+
+        try {
+            env.ui.setFreeze(id,env.config.penaltyFreezeMillis);
+            Thread.sleep(env.config.penaltyFreezeMillis);
+        } catch (InterruptedException e) {
+            env.ui.setFreeze(id,0);
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    public int score() {
+        return score;
+    }
+
+
+    public int [] generateRandomNumber() {
+        int [] randomSet = new int[2];
+        int a = (int) (Math.random() * table.grid.length);
+        int b = (int) (Math.random() * table.grid[0].length);
+        randomSet[0] = a;
+        randomSet[1] = b;
+        return randomSet;
+    }
+
+    public void generateRandomSet() {
+        while (setsQueue.size() < 3) {
+            int [] randomSet = generateRandomNumber();
+            int slot = randomSet[1] + this.table.grid[0].length * randomSet[0];
+            Integer card = this.table.getCard(slot);
+
+            if(setsQueue.size() < 3 && !setsQueue.contains(slot) && card!=null) {
+                setsQueue.add(slot);
+                table.placeToken(this.id, slot);
+            } else if (setsQueue.contains(slot)) {
+                setsQueue.remove(slot);
+                table.removeToken(this.id, slot);
             }
 
-        }
-
-    }
-
-    /**
-     * Places a player token on a grid slot.
-     * @param player - the player the token belongs to.
-     * @param slot   - the slot on which to place the token.
-     */
-    public void placeToken(int player, int slot) {
-
-        env.ui.placeToken(player, slot);
-
-    }
-
-    /**
-     * Removes a token of a player from a grid slot.
-     * @param player - the player the token belongs to.
-     * @param slot   - the slot from which to remove the token.
-     * @return       - true iff a token was successfully removed.
-     */
-    public boolean removeToken(int player, int slot) {
-        env.ui.removeToken(player, slot);
-        return false;
-    }
+            //should be done in table?
+            if (setsQueue.size() == 3) {
+                this.dealer.playerToQueue(this);
+            }
 
 
-    // getCard method
-    public Integer getCard(int slot) {
-        return this.slotToCard[slot];
-    }
-
-    public Integer getSlot(int card) {
-        return this.cardToSlot[card];
-    }
-
-    public void removeAllCardsFromTable(){//Anni added it
-        for(int slot = 0; slot < cardToSlot.length; slot++){
-            removeCard(slot);
-            env.ui.removeCard(slot);
         }
     }
-
-    public int getCardgrid(int row, int col) {
-        return grid[row][col];
-    }
-
-
 }
