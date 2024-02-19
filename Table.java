@@ -6,7 +6,6 @@ import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -31,13 +30,8 @@ public class Table {
      */
     protected final Integer[] cardToSlot; // slot per card (if any)
     public Integer [] [] grid;
-    protected final ArrayList[] slotsToPlayers;
-    protected final List<Integer>[] playersToSlots;
-
-//    AtomicInteger valCard;
-//    AtomicInteger valSlot;
-
-
+    protected ArrayList[] slotsToPlayers;
+    protected List<Integer>[] playersToSlots;
 
 
     /**
@@ -52,12 +46,11 @@ public class Table {
         this.env = env;
         this.slotToCard = slotToCard;
         this.cardToSlot = cardToSlot;
-        this.slotsToPlayers = new ArrayList[slotToCard.length];
+        this.slotsToPlayers = new ArrayList[slotToCard.length];  //array of slots which contains array of players
         //this.playersToSlots = new ArrayList[this.de.length];
-//        valCard = new AtomicInteger(0);
-//        valSlot = new AtomicInteger(0);
 
-        this.grid = new Integer[4][3];//Anni - should the size be generic?
+
+        this.grid = new Integer[env.config.rows][env.config.columns];
 
     }
 
@@ -104,31 +97,11 @@ public class Table {
      *
      * @post - the card placed is on the table, in the assigned slot.
      */
-    public void placeCard(int card, int slot) {
-//        try {
-//            Thread.sleep(env.config.tableDelayMillis);
-//        } catch (InterruptedException ignored) {}
-//
-//        int oldSlot;
-//        int oldCard;
-//
-//        int newSlot;
-//        int newCard;
-//
-//        do{
-//            oldSlot = valSlot.get();
-//            oldCard = valCard.get();
-//
-//            newSlot = slot;
-//            newCard = card;
-//
-//        }while(!(valCard.compareAndSet(oldCard,newCard) && valSlot.compareAndSet(oldSlot,newSlot)));
-//
-//        cardToSlot[valCard.get()] = valSlot.get();
-//        slotToCard[valSlot.get()] = valCard.get();
+    public void placeCard(int card, int slot) {//maybe synchronized
 
         cardToSlot[card] = slot;
         slotToCard[slot] = card;
+        env.ui.placeCard(card, slot);
 
         boolean keepLoop = true;
         for(int row = 0; row < this.grid.length && keepLoop; row++) {
@@ -147,31 +120,14 @@ public class Table {
      * Removes a card from a grid slot on the table.
      * @param slot - the slot from which to remove the card.
      */
-    public void removeCard(int slot) {
-//        try {
-//            Thread.sleep(env.config.tableDelayMillis);
-//        } catch (InterruptedException ignored) {}
-//
-//        Integer oldCard;
-//        Integer newCard = null;
-//
-//        if (slotToCard[slot] != null) {
-//
-//            do{
-//                oldCard = slotToCard[slot];
-//
-//            }while(!(valCard.compareAndSet(oldCard,newCard)));
-//
-//
-//
-//            slotToCard[slot] = null;
-//            cardToSlot[valCard.get()] = null;
-//
-//        }
+    public void removeCard(int slot) {//maybe synchronized
 
         int card = slotToCard[slot];
         slotToCard[slot] = null;
         cardToSlot[card] = null;
+        slotsToPlayers[slot]=null;
+        env.ui.removeTokens(slot);
+        env.ui.removeCard(slot);
 
         boolean keepLoop = true;
         for(int row = 0; row < this.grid.length && keepLoop; row++){
@@ -192,9 +148,15 @@ public class Table {
      * @param player - the player the token belongs to.
      * @param slot   - the slot on which to place the token.
      */
-    public void placeToken(int player, int slot) {
-
-        env.ui.placeToken(player, slot);
+    public void placeToken(int player, int slot) {//check about player who place token on empty slot
+        if(slotToCard[slot] != null){
+            if(slotsToPlayers[slot] == null){
+                slotsToPlayers[slot] = new ArrayList();
+            }
+            slotsToPlayers[slot].add(player);
+            env.ui.placeToken(player, slot);
+        }
+        //should we have playersToSlot? if yes then update it here too
 
     }
 
@@ -204,8 +166,13 @@ public class Table {
      * @param slot   - the slot from which to remove the token.
      * @return       - true iff a token was successfully removed.
      */
-    public boolean removeToken(int player, int slot) {
-        env.ui.removeToken(player, slot);
+    public boolean removeToken(int player, int slot) {//check about player who place token on empty slot
+        if (slotsToPlayers[slot] != null) {
+            slotsToPlayers[slot].remove(player);
+            env.ui.removeToken(player, slot);
+            return true;
+        }
+        //should we have playersTSlot? if yes then update it here too
         return false;
     }
 
@@ -219,16 +186,15 @@ public class Table {
         return this.cardToSlot[card];
     }
 
-    public void removeAllCardsFromTable(){//Anni added it
+    public void removeAllCardsFromTable(){
+
         for(int slot = 0; slot < cardToSlot.length; slot++){
             removeCard(slot);
             env.ui.removeCard(slot);
         }
     }
 
-    public int getCardgrid(int row, int col) {
-        return grid[row][col];
-    }
+
 
 
 }
