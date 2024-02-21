@@ -60,6 +60,7 @@ public class Player implements Runnable {
 
     public BlockingQueue<Integer> setsQueue;
 
+
     /**
      * The class constructor.
      *
@@ -85,15 +86,17 @@ public class Player implements Runnable {
     @Override
     public void run() {
         this.playerThread = Thread.currentThread();
-        env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
-        if (!human) createArtificialIntelligence();
+        while(!this.playerThread.isInterrupted()){
+            env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
+            if (!human) createArtificialIntelligence();
 
-        while (!terminate) {
-            //get input from player (create input manager?)
-            // TODO implement main player loop
+            while (!terminate) {
+
+                // TODO implement main player loop
+            }
+            if (!human) try { aiThread.join(); } catch (InterruptedException ignored) {}
+            env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
         }
-        if (!human) try { aiThread.join(); } catch (InterruptedException ignored) {}
-        env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
     }
 
     /**
@@ -102,26 +105,33 @@ public class Player implements Runnable {
      */
     private void createArtificialIntelligence() {
         // note: this is a very, very smart AI (!)
-        this.aiThread = new Thread(() -> {
-            env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
-            while (!terminate) {
-                generateRandomSet();
-                try {
-                    aiThread.sleep(1000);
-                } catch (InterruptedException ignored) {}//need to change in case of interrupt
+        while(!this.aiThread.isInterrupted()){
+            this.aiThread = new Thread(() -> {
+                env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
+                while (!terminate) {
+                    generateRandomSet();
+                    try {
+                        aiThread.sleep(1000);
+                    } catch (InterruptedException ignored) {}//need to change in case of interrupt
 
-            }
-            env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
-        }, "computer-" + id);
-        aiThread.start();
+                }
+                env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
+            }, "computer-" + id);
+            aiThread.start();
+        }
+
     }
 
     /**
      * Called when the game should be terminated.
      */
-    public void terminate() {//interrupt player(?)
+    public void terminate() {
         this.terminate = true;
-        // TODO implement
+        if(!this.human){
+            this.aiThread.interrupt();
+        }
+
+        this.playerThread.interrupt();
 
     }
 
@@ -144,9 +154,8 @@ public class Player implements Runnable {
 
         //should be done in table?
         if (setsQueue.size() == 3) {
-              this.dealer.playerToQueue(this);
-
-              //notify dealer - getSetToTest
+            this.dealer.playerToQueue(this);
+            this.dealer.isThereSet.notifyAll();
 
 
         }
@@ -192,7 +201,7 @@ public class Player implements Runnable {
 
         try {
             env.ui.setFreeze(id,env.config.penaltyFreezeMillis);
-            Thread.sleep(env.config.penaltyFreezeMillis);
+            Thread.currentThread().sleep(env.config.penaltyFreezeMillis);
         } catch (InterruptedException e) {
             env.ui.setFreeze(id,0);
             Thread.currentThread().interrupt();
