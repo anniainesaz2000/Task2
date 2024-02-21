@@ -31,7 +31,7 @@ public class Table {
     protected final Integer[] cardToSlot; // slot per card (if any)
     public Integer [] [] grid;
     protected ArrayList[] slotsToPlayers;
-    protected List<Integer>[] playersToSlots;
+    //protected List<Integer>[] playersToSlots;
 
 
     /**
@@ -156,7 +156,7 @@ public class Table {
             slotsToPlayers[slot].add(player);
             env.ui.placeToken(player, slot);
         }
-        //should we have playersToSlot? if yes then update it here too
+
 
     }
 
@@ -190,8 +190,11 @@ public class Table {
 
         for(int slot = 0; slot < cardToSlot.length; slot++){
             removeCard(slot);
-            env.ui.removeCard(slot);
         }
+    }
+
+    public Integer[] getSlotToCard(){
+        return this.slotToCard;
     }
 
 
