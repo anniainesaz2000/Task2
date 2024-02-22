@@ -86,6 +86,7 @@ public class Dealer implements Runnable {
             sleepUntilWokenOrTimeout();
             updateTimerDisplay(false);
             removeCardsFromTable();
+            System.out.println("before placeCardsOnTable");
             placeCardsOnTable();
         }
     }
@@ -124,17 +125,15 @@ public class Dealer implements Runnable {
      * Checks cards should be removed from the table and removes them.
      */
     private void removeCardsFromTable() {
-        synchronized (this.lockTable){
+        System.out.println("removeCardsFromTable");
+        //synchronized (this.table){
             returnAllToDeck();
             table.removeAllCardsFromTable();
             for(Player player : players){
                 player.setsQueue.clear();
             }
-        }
-
-//        if(env.util.findSets(deck, 1).size() == 0){
-//            this.terminate = true;
-//        }
+            //this.table.notifyAll();
+        //}
 
     }
 
@@ -152,7 +151,8 @@ public class Dealer implements Runnable {
      * Check if any cards can be removed from the deck and placed on the table.
      */
     private void placeCardsOnTable() {
-        synchronized (this.lockTable){
+        //synchronized (this.lockTable){
+        System.out.println("placeCardsOnTable");
             shuffleDeck();
             int slot = 0;
 
@@ -166,7 +166,7 @@ public class Dealer implements Runnable {
                     }
                 }
             }
-        }
+        //}
 
 
         }
@@ -202,23 +202,42 @@ public class Dealer implements Runnable {
     /**
      * Reset and/or update the countdown and the countdown display.
      */
-    private void updateTimerDisplay(boolean reset) {//should we update current time?
-        int currentTime = 60000;  // Initial time in milliseconds (60 seconds)
+    private void updateTimerDisplay(boolean reset) {
 
-        // Update time each second
-        for (int i = 0; i < 60; i++) {
-            env.ui.setCountdown(currentTime, reset);
-            currentTime -= 1000;  // Subtract 1000 milliseconds (1 second)
-            getSetToTest();
-            try {
-                Thread.sleep(1000);  // Pause for 1 second
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-//                e.printStackTrace();
+        reshuffleTime = System.currentTimeMillis() + env.config.turnTimeoutMillis;
+        while(!Thread.currentThread().isInterrupted() && reshuffleTime - System.currentTimeMillis()>=0) {
+
+            //if (!reset) {
+            System.out.println("1");
+            if (reshuffleTime - System.currentTimeMillis() > env.config.turnTimeoutWarningMillis) {
+                System.out.println("1.1");
+                System.out.println(reshuffleTime - System.currentTimeMillis());
+                env.ui.setCountdown(Math.max(reshuffleTime - System.currentTimeMillis(), 0), false);
+
+                try {
+                    Thread.sleep(1000);  // Pause for 1 second
+
+                    getSetToTest();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    // Handle the exception in a way that is appropriate for your specific application
+                }
             }
-        }
-    }
+            else {
+                System.out.println("3");
+                env.ui.setCountdown(reshuffleTime - System.currentTimeMillis(), true);
+                try {
+                    Thread.sleep(500);  // Pause for 1 second
+                    getSetToTest();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    // Handle the exception in a way that is appropriate for your specific application
+                }
+            }
 
+        }
+        env.ui.setCountdown(0,true);
+    }
     /**
      * Returns all the cards from the table to the deck.
      *
@@ -271,20 +290,20 @@ public class Dealer implements Runnable {
                     for(int row = 0; row < this.table.grid.length; row++){
                         for(int col = 0; col < this.table.grid[0].length; col++){
                             if(this.table.grid[row][col] == card){
-                                table.removeCard(slot);
+                                //synchronized (this.lockTable) {
+                                    table.removeCard(slot);
+                                //}
                                 for(int j = 0; j<this.players.length; j++){
                                     if(players[j].setsQueue.contains(card)){
                                         players[j].setsQueue.remove(card);
                                         table.removeToken(players[j].id, slot);
                                     }
                                 }
-                                synchronized (this.lockTable){
-                                    if (!this.deck.isEmpty()){
-                                        {
-                                            placeSpecificCardOnTable(row, col);
-                                        }
-                                }
+                                //synchronized (this.lockTable){
+                                if (!this.deck.isEmpty()) {
 
+                                        placeSpecificCardOnTable(row, col);
+                                    //}
 
                                 }
 
@@ -299,7 +318,7 @@ public class Dealer implements Runnable {
 
         }
 
-    private void shuffleDeck(){//Anni
+    private void shuffleDeck(){
         Collections.shuffle(this.deck);
     }
     public void playerToQueue(Player player){
