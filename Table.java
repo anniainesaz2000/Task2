@@ -121,25 +121,26 @@ public class Table {
      * @param slot - the slot from which to remove the card.
      */
     public void removeCard(int slot) {//maybe synchronized
-
+        System.out.println("slot " + slot);
         int card = slotToCard[slot];
+        System.out.println("card " + card);
         slotToCard[slot] = null;
         cardToSlot[card] = null;
         slotsToPlayers[slot]=null;
         env.ui.removeTokens(slot);
         env.ui.removeCard(slot);
 
-        boolean keepLoop = true;
-        for(int row = 0; row < this.grid.length && keepLoop; row++){
-            for(int col = 0; col < this.grid[0].length && keepLoop; col++){
-                if(this.grid[row][col] == card){
-                    this.grid[row][col] = null;
-                    keepLoop = false;
-                }
-
-            }
-
-        }
+//        boolean keepLoop = true;
+//        for(int row = 0; row < this.grid.length && keepLoop; row++){
+//            for(int col = 0; col < this.grid[0].length && keepLoop; col++){
+//                if(this.grid[row][col] == card){
+//                    this.grid[row][col] = null;
+//                    keepLoop = false;
+//                }
+//
+//            }
+//
+//        }
 
     }
 
@@ -187,9 +188,12 @@ public class Table {
     }
 
     public void removeAllCardsFromTable(){
-
-        for(int slot = 0; slot < cardToSlot.length; slot++){
-            removeCard(slot);
+        for(int row = 0; row < this.grid.length; row++) {
+            for (int col = 0; col < this.grid[0].length; col++) {
+                int card = this.grid[row][col];
+                int slot = cardToSlot[card];
+                removeCard(slot);
+            }
         }
     }
 
