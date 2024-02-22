@@ -58,7 +58,8 @@ public class Player implements Runnable {
 
     private Dealer dealer;
 
-    public BlockingQueue<Integer> setsQueue;
+    public ArrayBlockingQueue<Integer> setsQueue;
+    Boolean isFrozen;
 
 
     /**
@@ -78,6 +79,7 @@ public class Player implements Runnable {
         this.human = human;
         this.terminate = false;
         setsQueue = new ArrayBlockingQueue<Integer>(3);
+        this.isFrozen = false;
     }
 
     /**
@@ -112,6 +114,7 @@ public class Player implements Runnable {
                     generateRandomSet();
                     try {
                         aiThread.sleep(1000);
+                        this.isFrozen = true;
                     } catch (InterruptedException ignored) {}//need to change in case of interrupt
 
                 }
@@ -141,24 +144,32 @@ public class Player implements Runnable {
      * @param slot - the slot corresponding to the key pressed.
      */
     public void keyPressed(int slot) {
-        // needed to use with thread
+
+        try{
+            while(this.playerThread.getState() != Thread.State.RUNNABLE){
+                this.table.wait();
+            }
+        }catch(InterruptedException e){
+            this.playerThread.interrupt();
+        }
 
         Integer card = table.getCard(slot);
         if(setsQueue.size() < 3 && !setsQueue.contains(slot) && card!=null) {
-            setsQueue.add(slot);
+            //synchronized (this.dealer.lockTable) {
+            setsQueue.offer(slot);
             table.placeToken(this.id, slot);
+            //}
         } else if (setsQueue.contains(slot)) {
             setsQueue.remove(slot);
             table.removeToken(this.id, slot);
         }
 
-        //should be done in table?
         if (setsQueue.size() == 3) {
             this.dealer.playerToQueue(this);
             this.dealer.isThereSet.notifyAll();
 
-
         }
+
 
     }
 
@@ -183,6 +194,7 @@ public class Player implements Runnable {
         try {
             env.ui.setFreeze(this.id,env.config.pointFreezeMillis);
             Thread.sleep(env.config.pointFreezeMillis);
+            this.isFrozen = true;
         } catch (InterruptedException e) {
             env.ui.setFreeze(id,0);
             Thread.currentThread().interrupt();
@@ -201,10 +213,11 @@ public class Player implements Runnable {
 
         try {
             env.ui.setFreeze(id,env.config.penaltyFreezeMillis);
-            Thread.currentThread().sleep(env.config.penaltyFreezeMillis);
-        } catch (InterruptedException e) {
+            this.playerThread.sleep(env.config.penaltyFreezeMillis);
+            this.isFrozen = true;
             env.ui.setFreeze(id,0);
-            Thread.currentThread().interrupt();
+        } catch (InterruptedException e) {
+            this.playerThread.interrupt();
         }
     }
 
@@ -229,7 +242,7 @@ public class Player implements Runnable {
             Integer card = this.table.getCard(slot);
 
             if(setsQueue.size() < 3 && !setsQueue.contains(slot) && card!=null) {
-                setsQueue.add(slot);
+                setsQueue.offer(slot);
                 table.placeToken(this.id, slot);
             } else if (setsQueue.contains(slot)) {
                 setsQueue.remove(slot);
