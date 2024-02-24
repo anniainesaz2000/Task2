@@ -63,6 +63,8 @@ public class Player implements Runnable {
     public Boolean isFrozen;
     public Boolean lockTable;
 
+    protected int tokensCounter ;
+
 
     /**
      * The class constructor.
@@ -83,6 +85,8 @@ public class Player implements Runnable {
         setsQueue = new ArrayBlockingQueue<Integer>(3);
         this.isFrozen = false;
         this.lockTable = false;
+
+        this.tokensCounter = 0;
     }
 
     /**
@@ -97,36 +101,40 @@ public class Player implements Runnable {
 
             while (!terminate) {
                 treatSetQueue();
-                }
             }
-            if (!human) try { aiThread.join(); } catch (InterruptedException ignored) {}
-            env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
         }
+        if (!human) try { aiThread.join(); } catch (InterruptedException ignored) {}
+        env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
+    }
 
     public void treatSetQueue() {
-        try {
-            int slot = this.setsQueue.take();
-            Integer card = table.getCard(slot);
-            List<Integer> tokens = this.table.playersToSlots[this.id];
-            System.out.println("playersToSlots: " + tokens);
-            int numOfTokens = tokens.size();
-            System.out.println("before placing tokens");
-            System.out.println("numOfTokens: " + numOfTokens);
-            if (numOfTokens < 3 && !tokens.contains(slot) && card != null) {
-                table.placeToken(this.id, slot);
-                System.out.println("placeToken: " + slot);
-            } else if (tokens.contains(slot)) {
-                System.out.println("remove token in player " + slot);
-                table.removeToken(this.id, slot);
-            }
 
-            if (tokens.size() == 3) {
-                this.dealer.playerToQueue(this);
-                synchronized (this.dealer.isThereSet){
-                    this.dealer.isThereSet.notifyAll();
+        try{
+            if (!this.lockTable && !this.isFrozen) {
+                Integer slot = this.setsQueue.take();
+
+                List<Integer> tokens = this.table.playersToSlots[this.id];
+                if (tokens.size() < 3 && !tokens.contains(slot)) {
+                    Integer card = this.table.getCard(slot);
+                    if (card != null) {
+                        table.placeToken(this.id, slot);
+                    }
+                } else {
+                    if (tokens.contains(slot)) {
+                        tokens.remove(slot);
+                        table.removeToken(this.id, slot);
+                    }
                 }
+                if (tokens.size() == 3) {
+                    this.dealer.playerToQueue(this);
+                    synchronized (this.dealer.isThereSet) {
+                        this.dealer.isThereSet.notifyAll();
+                    }
+                }
+
             }
-        }catch(InterruptedException e){
+        }
+        catch(InterruptedException e){
         }
 
     }
@@ -193,15 +201,14 @@ public class Player implements Runnable {
     public int[] setListToArray(){
 
         List<Integer> tokens = this.table.playersToSlots[this.id];
+        System.out.println("tokens: " + tokens);
         int[] intArray = tokens.stream()
                 .mapToInt(Integer::intValue)
                 .toArray();
-//        Integer[] testSet = tokens.toArray(new Integer[3]);
-//        int[] testCards = new int[3];
-//        for (int i = 0; i < 3; i++) {
-//            testCards[i] = this.table.getCard(testSet[i]);
-//             }
 
+        for(int i = 0; i < intArray.length; i++){
+            System.out.println("intArray: " + intArray[i]);
+        }
         return intArray;
     }
 
@@ -237,7 +244,7 @@ public class Player implements Runnable {
     /**
      * Penalize a player and perform other related actions.
      */
-    public void penalty() {//sould we differ between Ai and human?
+    public void penalty() {
 
         try {
             env.ui.setFreeze(id,env.config.penaltyFreezeMillis);
@@ -299,5 +306,22 @@ public class Player implements Runnable {
 
     public void setLockTable(boolean status){
         this.lockTable = status;
+    }
+    private void turnToSet(){
+        if(!setsQueue.isEmpty()){
+            Integer slot = this.setsQueue.remove();
+            if(table.slotToCard[slot] != null){
+                boolean isToken = table.playerPlacedToken[this.id][slot];
+                if(isToken){
+                    table.removeToken(this.id, slot);
+                    tokensCounter = tokensCounter - 1;
+                }
+                else{
+                    table.placeToken(this.id, slot);
+                    tokensCounter = tokensCounter + 1;
+                }
+
+            }
+        }
     }
 }
