@@ -34,6 +34,8 @@ public class Table {
     public Integer [] [] grid;
     protected List<Integer>[] slotsToPlayers;
     protected List<Integer>[] playersToSlots;
+
+    protected boolean [] [] playerPlacedToken ;
     //private final ReadWriteLock lockCards;
     //private final ReadWriteLock lockTokens;
 
@@ -64,6 +66,8 @@ public class Table {
         this.grid = new Integer[env.config.rows][env.config.columns];
         //this.lockCards = new ReentrantReadWriteLock();
         //this.lockTokens = new ReentrantReadWriteLock();
+
+        this.playerPlacedToken= new boolean[env.config.players][env.config.columns*env.config.rows];
 
     }
 
@@ -160,14 +164,14 @@ public class Table {
             boolean keepLoop = true;
             for(int row = 0; row < this.grid.length && keepLoop; row++){
                 for(int col = 0; col < this.grid[0].length && keepLoop; col++){
-                    if(this.grid[row][col] == card){
+                    if( (this.grid[row][col]) != null && (this.grid[row][col] == card)){
                         this.grid[row][col] = null;
                         keepLoop = false;
                     }
 
                 }
 
-        }
+            }
             env.ui.removeCard(slot);
         }
         //this.lockCards.writeLock().unlock();
@@ -185,8 +189,17 @@ public class Table {
             slotsToPlayers[slot].add(player);
             playersToSlots[player].add(slot);
             System.out.println("playersToSlots: " +  playersToSlots[player]);
+            System.out.println("slotsToPlayers: " + slotsToPlayers[slot]);
             env.ui.placeToken(player, slot);
         }
+//        if(playerPlacedToken[player][slot] == false){
+//            playerPlacedToken[player][slot] = true;
+//            //slotsToPlayers[slot].add(player);
+//            //playersToSlots[player].add(slot);
+//           /// System.out.println("playersToSlots: " +  playersToSlots[player]);
+//           // System.out.println("slotsToPlayers: " + slotsToPlayers[slot]);
+//            env.ui.placeToken(player, slot);
+//        }
         //this.lockTokens.writeLock().unlock();
     }
 
@@ -201,10 +214,10 @@ public class Table {
 
         if (slotsToPlayers[slot] != null && slotsToPlayers[slot].contains(player)) {
             System.out.println("remove from slotsToPlayers " + slot);
-            slotsToPlayers[slot].remove(player);
+            slotsToPlayers[slot].remove(slotsToPlayers[slot].indexOf(player));
             if (playersToSlots[player] != null && playersToSlots[player].contains(slot)) {
                 System.out.println("remove from playersToSlots " + slot);
-                playersToSlots[player].remove(slot);
+                playersToSlots[player].remove(playersToSlots[player].indexOf(slot));
 
             }
             env.ui.removeToken(player, slot);
@@ -212,6 +225,8 @@ public class Table {
             //this.lockTokens.writeLock().unlock();
             return true;
         }
+
+
         //this.lockTokens.writeLock().unlock();
         return false;
     }
