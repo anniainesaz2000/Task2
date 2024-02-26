@@ -150,10 +150,10 @@ public class Table {
         } catch (InterruptedException ignored) {}
 
         //this.lockCards.writeLock().lock();
-        System.out.println("slot " + slot);
+        // System.out.println("slot " + slot);
         if (slotToCard[slot] != null){
             int card = slotToCard[slot];
-            System.out.println("card " + card);
+            //   System.out.println("card " + card);
             for(int id = 0 ; id < playersToSlots.length; id++){
                 removeToken(id, slot);
             }
@@ -188,8 +188,8 @@ public class Table {
         if(slotToCard[slot] != null){
             slotsToPlayers[slot].add(player);
             playersToSlots[player].add(slot);
-            System.out.println("playersToSlots: " +  playersToSlots[player]);
-            System.out.println("slotsToPlayers: " + slotsToPlayers[slot]);
+            //    System.out.println("playersToSlots: " +  playersToSlots[player]);
+            //     System.out.println("slotsToPlayers: " + slotsToPlayers[slot]);
             env.ui.placeToken(player, slot);
         }
 //        if(playerPlacedToken[player][slot] == false){
@@ -213,15 +213,15 @@ public class Table {
         //this.lockTokens.writeLock().lock();
 
         if (slotsToPlayers[slot] != null && slotsToPlayers[slot].contains(player)) {
-            System.out.println("remove from slotsToPlayers " + slot);
+            //    System.out.println("remove from slotsToPlayers " + slot);
             slotsToPlayers[slot].remove(slotsToPlayers[slot].indexOf(player));
             if (playersToSlots[player] != null && playersToSlots[player].contains(slot)) {
-                System.out.println("remove from playersToSlots " + slot);
+                //       System.out.println("remove from playersToSlots " + slot);
                 playersToSlots[player].remove(playersToSlots[player].indexOf(slot));
 
             }
             env.ui.removeToken(player, slot);
-            System.out.println("remove from gui ");
+            //     System.out.println("remove from gui ");
             //this.lockTokens.writeLock().unlock();
             return true;
         }
