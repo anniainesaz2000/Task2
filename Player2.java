@@ -54,8 +54,9 @@ public class Player implements Runnable {
      * The current score of the player.
      */
     private int score;
+    private volatile boolean point;
 
-    // our new fields
+    private volatile boolean penalty;
 
     private Dealer dealer;
 
@@ -85,7 +86,6 @@ public class Player implements Runnable {
         setsQueue = new ArrayBlockingQueue<Integer>(3);
         this.isFrozen = false;
         this.lockTable = false;
-
         this.tokensCounter = 0;
     }
 
@@ -95,13 +95,25 @@ public class Player implements Runnable {
     @Override
     public void run() {
         this.playerThread = Thread.currentThread();
-        while(!this.playerThread.isInterrupted()){
-            env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
-            if (!human) createArtificialIntelligence();
+        //  while(!this.playerThread.isInterrupted()){
+        env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
+        if (!human) createArtificialIntelligence();
 
-            while (!terminate) {
+        while (!terminate) {
+            if(!this.setsQueue.isEmpty()){
                 treatSetQueue();
             }
+
+            if (point) {
+                point();
+                point = false;
+            } else if (penalty) {
+                penalty();
+                penalty = false;
+            }
+
+
+
         }
         if (!human) try { aiThread.join(); } catch (InterruptedException ignored) {}
         env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
@@ -117,6 +129,7 @@ public class Player implements Runnable {
                 if (tokens.size() < 3 && !tokens.contains(slot)) {
                     Integer card = this.table.getCard(slot);
                     if (card != null) {
+                        //   System.out.println("slot: " + slot);
                         table.placeToken(this.id, slot);
                     }
                 } else {
@@ -126,6 +139,9 @@ public class Player implements Runnable {
                     }
                 }
                 if (tokens.size() == 3) {
+                    this.isFrozen = true;
+                    this.playerThread.sleep(100);
+                    this.isFrozen = false;
                     this.dealer.playerToQueue(this);
                     synchronized (this.dealer.isThereSet) {
                         this.dealer.isThereSet.notifyAll();
@@ -145,24 +161,33 @@ public class Player implements Runnable {
      */
     private void createArtificialIntelligence() {
         // note: this is a very, very smart AI (!)
-        while(!this.aiThread.isInterrupted()){
-            this.aiThread = new Thread(() -> {
-                env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
-                while (!terminate) {
-                    generateRandomSet();
-                    try {
-                        this.isFrozen = true;
-                        aiThread.sleep(1000);
-                        this.isFrozen = false;
-                    } catch (InterruptedException e) {
-                        this.aiThread.interrupt();
-                    }
 
+        this.aiThread = new Thread(() -> {
+            env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
+            while (!terminate) {
+                System.out.println("AI is thinking...");
+
+                try {
+                    //Thread.sleep(1000);
+                    int slot = getRandomNumber(0, env.config.tableSize);
+                    System.out.println("AI is pressing slot " + slot);
+                    this.keyPressed(slot);
+                    //treatSetQueue();
                 }
-                env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
-            }, "computer-" + id);
-            aiThread.start();
-        }
+                catch (Exception e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
+        }, "computer-" + id);
+        aiThread.start();
+    }
+
+
+
+    private int getRandomNumber(int i, int i1) {
+
+        return (int) (Math.random() * (i1 - i) + i);
 
     }
 
@@ -174,9 +199,9 @@ public class Player implements Runnable {
         if(!this.human){
             this.aiThread.interrupt();
         }
-        else{
+        //else{
             this.playerThread.interrupt();
-        }
+        //}
 
     }
 
@@ -190,7 +215,6 @@ public class Player implements Runnable {
             if(!this.lockTable && !this.isFrozen){
                 if(!this.table.removeToken(this.id, slot)){
                     this.setsQueue.offer(slot);
-                    System.out.println("setQueue: " + this.setsQueue);
                 }
             }
         }catch(Exception e){
@@ -198,19 +222,6 @@ public class Player implements Runnable {
         }
     }
 
-    public int[] setListToArray(){
-
-        List<Integer> tokens = this.table.playersToSlots[this.id];
-        System.out.println("tokens: " + tokens);
-        int[] intArray = tokens.stream()
-                .mapToInt(Integer::intValue)
-                .toArray();
-
-        for(int i = 0; i < intArray.length; i++){
-            System.out.println("intArray: " + intArray[i]);
-        }
-        return intArray;
-    }
 
     /**
      * Award a point to a player and perform other related actions.
@@ -218,15 +229,13 @@ public class Player implements Runnable {
      * @post - the player's score is increased by 1.
      * @post - the player's score is updated in the ui.
      */
-    public void point() {//sould we differ between Ai and human?
-
+    public void point() {
         try {
-            env.ui.setFreeze(this.id,env.config.pointFreezeMillis);
+            env.ui.setFreeze(this.id, env.config.pointFreezeMillis);
             this.isFrozen = true;
-            if(this.human){
+            if (this.human) {
                 this.playerThread.sleep(env.config.pointFreezeMillis);
-            }
-            else{
+            } else {
                 this.aiThread.sleep(env.config.pointFreezeMillis);
             }
             this.isFrozen = false;
@@ -234,7 +243,7 @@ public class Player implements Runnable {
             Thread.currentThread().interrupt();
         }
 
-        env.ui.setFreeze(id,0);
+        env.ui.setFreeze(id, 0);
         int ignored = table.countCards(); // this part is just for demonstration in the unit tests
         env.ui.setScore(id, ++score);
 
@@ -247,20 +256,33 @@ public class Player implements Runnable {
     public void penalty() {
 
         try {
-            env.ui.setFreeze(id,env.config.penaltyFreezeMillis);
+
             this.isFrozen = true;
             if(this.human){
-                this.playerThread.sleep(env.config.penaltyFreezeMillis);
+                long penaltyTime = this.env.config.penaltyFreezeMillis;
+                long divide = penaltyTime / 1000;
+                while(penaltyTime > 0){
+                    this.env.ui.setFreeze(this.id, penaltyTime);
+                    this.playerThread.sleep((this.env.config.penaltyFreezeMillis)/divide);
+                    penaltyTime = penaltyTime - 1000;
+                }
             }
             else{
-                this.aiThread.sleep(env.config.penaltyFreezeMillis);
+                long penaltyTime = this.env.config.penaltyFreezeMillis;
+                long divide = penaltyTime / 1000;
+                while(penaltyTime > 0){
+                    this.env.ui.setFreeze(this.id, penaltyTime);
+                    this.aiThread.sleep((this.env.config.penaltyFreezeMillis)/divide);
+                    penaltyTime = penaltyTime - 1000;
+                }
             }
 
             this.isFrozen = false;
-            env.ui.setFreeze(id,0);
+            env.ui.setFreeze(id, 0);
         } catch (InterruptedException e) {
             this.playerThread.interrupt();
         }
+
     }
 
     public int score() {
@@ -277,31 +299,13 @@ public class Player implements Runnable {
         return randomSet;
     }
 
-    public void generateRandomSet() {
-        List<Integer> tokens = this.table.playersToSlots[this.id];
-        while (tokens.size() < 3) {
-            int [] randomSet = generateRandomNumber();
-            int slot = randomSet[1] + this.table.grid[0].length * randomSet[0];
-            Integer card = this.table.getCard(slot);
 
-            if(tokens.size() < 3 && !tokens.contains(slot) && card!=null) {
-                tokens.add(slot);
-                table.placeToken(this.id, slot);
-            } else if (tokens.contains(slot)) {
-                tokens.remove(slot);
-                table.removeToken(this.id, slot);
-            }
+    public void setPointToTrue() {
+        point = true;
+    }
 
-            if (tokens.size() == 3) {
-                this.dealer.playerToQueue(this);
-                synchronized (this.dealer.isThereSet){
-                    this.dealer.isThereSet.notifyAll();
-                }
-
-            }
-
-
-        }
+    public void setPenaltyToTrue() {
+        penalty = true;
     }
 
     public void setLockTable(boolean status){
